@@ -16,18 +16,18 @@
   "ocr_api_list": [
     {
       "id": "1",
-      "ocr_api_key": "PleaseGetYourOwnKey-OCR.space-Has-Great-Free-Plan",
-      "ocr_api_url": "https://apipro1a.ocr.space/parse/image"
+      "ocr_api_key": "b3deab0b0b88957",
+      "ocr_api_url": "https://api.ocr.space/parse/image"
     },
     {
       "id": "2",
-      "ocr_api_key": "PleaseGetYourOwnKey-OCR.space-Has-Great-Free-Plan",
-      "ocr_api_url": "https://apipro2.ocr.space/parse/image"
+      "ocr_api_key": "b3deab0b0b88957",
+      "ocr_api_url": "https://api.ocr.space/parse/image"
     },
     {
-        "id":"3",
-        "ocr_api_key": "PleaseGetYourOwnKey-OCR.space-Has-Great-Free-Plan",
-        "ocr_api_url": "https://apipro3.ocr.space/parse/image"
+      "id": "3",
+      "ocr_api_key": "b3deab0b0b88957",
+      "ocr_api_url": "https://api.ocr.space/parse/image"
     }
   ],
     "ocr_server_reset_time": 86400,

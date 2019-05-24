@@ -13,7 +13,7 @@
 	var IS_CAPTURED = false;
 	var $SELECTOR;
 	var OPTIONS;
-	var MAX_ZINDEX = 2147483646;
+	var MAX_ZINDEX = 99999;
 	var WIDGETBOTTOM = -8;
 	var SELECTOR_BORDER = 2;
 	var OCR_LIMIT = {
@@ -156,7 +156,7 @@
 		var $MASK;
 		var maskString = [
 			'<div class="ocrext-element ocrext-mask">',
-			'<p class="ocrext-element">Please select text to grab.</p>',
+			//'<p class="ocrext-element">Please select text to grab.</p>',
 			'<div class="ocrext-overlay-corner ocrext-corner-tl"></div>',
 			'<div class="ocrext-overlay-corner ocrext-corner-tr"></div>',
 			'<div class="ocrext-overlay-corner ocrext-corner-br"></div>',
@@ -389,6 +389,7 @@
 	 * is asynchronous, returns a promise
 	 */
 	function _captureImageOntoCanvas() {
+        //alert("_captureImageOntoCanvas()");
 		var $canOrig = $('#ocrext-canOrig'),
 			$can = $('#ocrext-can'),
 			$dialog = $('body').find('.ocrext-wrapper');
@@ -413,6 +414,7 @@
 					img.src = response.dataURL;
 					$imageLoadDfd
 						.done(function () {
+                            //alert("$imageLoadDfd.done callback");
 							// the screencapture is messed up when pixel density changes; compare the window width
 							// and image width to determine if it needs to be fixed
 							// also, this fix problem with page zoom
@@ -425,10 +427,15 @@
 								scaledWidth = width * scaleFactor,
 								scaledHeight = height * scaleFactor;
 
+                            //alert(scaledWidth);
+                            //alert(scaledHeight);
+
 							$canOrig.attr({
 								width: scaledWidth,
 								height: scaledHeight
 							});
+                            //alert($canOrig.width());
+                            //alert($canOrig.height());
 
 							$can.attr({
 								width: width,
@@ -471,6 +478,7 @@
 	 * Failover logic happens here!
 	 */
 	function _postToOCR($ocrPromise, postData, attempt) {
+        //alert("posting data to OCR");
 		var formData = new FormData();
 		formData.append('language', postData.language);
 		formData.append('file', postData.blob, postData.fileName);
@@ -603,7 +611,7 @@
 	 * 4. AJAX error handling anywhere in the pipeline
 	 *
 	 */
-	function _processOCRTranslate() {
+	function _processOCRTranslate(e) {
 		// var data = new FormData();
 		var dataURI;
 		var ocrPostData;
@@ -618,6 +626,7 @@
 		// read options before every AJAX call, will ensure that any changes
 		// in settings are transferred to existing sessions as well
 		getOptions().done(function () {
+            //alert("getOptions().done callback");
 			_setOCRFontSize();
 			OCRTranslator.resetOverlayInformation();
 			$process
@@ -664,11 +673,15 @@
 					$ocr = null;
 				});
 
+            //alert("registering $ocr.done");
 			$ocr
 				.done(function (text, overlayInfo) {
 					$('.ocrext-ocr-message')
 						.val(text);
-
+                    //pass ocrEvent with captured text to aleksi
+                    window.postMessage({ type: "FROM_PAGE", text: "ocrEvent", event: JSON.parse(JSON.stringify(e)) }, "*");
+                    //reset so that mousedown initiates recapture
+                    IS_CAPTURED = false;
 					// dataURI should be visible as it is encapsulated within _processOCRTranslate
 					// the mad-world of async programming
 					// OCRTranslator.textOverlay.setOverlayInformation(overlayInfo, dataURI);
@@ -724,6 +737,9 @@
 				(dims.width < OCR_LIMIT.min.width && dims.height < OCR_LIMIT.min.height) ||
 				(dims.width > OCR_LIMIT.max.width && dims.height > OCR_LIMIT.max.height)
 			) {
+                //alert("dimension error");
+                //alert(dims.width);
+                //alert(dims.height);
 				$ocr.reject({
 					type: 'OCR',
 					stat: 'OCR conversion failed',
@@ -731,6 +747,7 @@
 					details: null,
 					code: null
 				});
+                IS_CAPTURED = false;
 				return false;
 			}
 
@@ -859,7 +876,7 @@
 			// manipulate DOM to remove temporary cruft
 			$body.removeClass('ocrext-ch');
 			$SELECTOR.remove();
-			Mask.hide();
+			//Mask.hide();
 			// show the widget
 			_setZIndex();
 			$dialog = $body.find('.ocrext-wrapper');
@@ -868,12 +885,13 @@
 					// zIndex: MAX_ZINDEX,
 					// opacity: 0,
 					bottom: -$dialog.height()
-				})
-				.show();
+				});
+				//.show();
 
 			// initiate image capture 
 			_captureImageOntoCanvas().done(function () {
-				_processOCRTranslate();
+                //alert("_processOCRTranslate(evt);");
+				_processOCRTranslate(evt);
 			});
 		});
 	}
@@ -905,6 +923,7 @@
 		// reset stuff
 		OCRTranslator.reset();
 		Mask.addToBody().show();
+		//Mask.addToBody().hide();
 		$('body').addClass('ocrext-ch');
 	}
 
@@ -996,6 +1015,7 @@
 		}, function ( /*resp*/ ) {
 
 		});
+        window.postMessage({ type: "FROM_PAGE", text: "ocrDisabled" }, "*");
 	}
 
 
@@ -1018,6 +1038,7 @@
 			this._initializing = true;
 			this._initialized = false;
 			$ready = _bootStrapResources();
+
 
 			// listen to runtime messages from other pages, mainly the background page
 			chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
@@ -1074,7 +1095,29 @@
 			ISPOSITIONED = ['absolute', 'relative', 'fixed'].indexOf($('body').css('position')) >= 0;
 			this.initWidgets();
 			this.bindEvents();
-
+            // Listen for recapture events from other extensions
+            window.addEventListener("message", function(event) {
+              // We only accept messages from ourselves
+              if (event.source != window)
+                return;
+            
+              if (event.data.type && (event.data.type == "FROM_PAGE")) {
+                  console.log("received ocr capture event: "+event.data.text);
+                  if (event.data.text == 'ocrRequestStatus') {
+		              if (OCRTranslator.state === 'disabled') {
+                          window.postMessage({ type: "FROM_PAGE", text: "ocrDisabled" }, "*");
+                      } else {
+                          window.postMessage({ type: "FROM_PAGE", text: "ocrEnabled" }, "*");
+                      }
+                  }
+                  if (event.data.text == 'ocrEnableCapture') {
+					  OCRTranslator.enable();
+                  }
+                  if (event.data.text == 'ocrDisableCapture') {
+                      onOCRClose();
+                  }
+              }
+            }, false);
 			// tell the background page that the tab is ready
 			chrome.runtime.sendMessage({
 				evt: 'ready'
@@ -1088,6 +1131,7 @@
 				$('.ocrext-ocr-message').addClass('ocrext-preserve-whitespace expanded');
 				$('.ocrext-grid-translated').hide();
 			}
+            $('#ocrext-canOrig').appendTo('body');
 			// set paragraph font
 			_setLanguageOnUI();
 			// set OCR font size
@@ -1204,11 +1248,14 @@
 			$('.ocrext-title span').text(appName);
 			OCRTranslator.reset();
 			// show mask
-			Mask.addToBody().show();
+			//Mask.addToBody().hide();
+		    Mask.addToBody().show();
 			// instantiate overlay
-			this.textOverlay = TextOverlay();
-			$body.on('mousedown', onOCRMouseDown);
+			//this.textOverlay = TextOverlay();
+			//$body.on('mousedown', onOCRMouseDown);
+            $('.ocrext-mask').on('mousedown', onOCRMouseDown);
 			OCRTranslator.state = 'enabled';
+            window.postMessage({ type: "FROM_PAGE", text: "ocrEnabled" }, "*");
 			return this;
 		},
 
